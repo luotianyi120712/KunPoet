@@ -178,13 +178,50 @@
         const poemContentWrapper = document.getElementById('poemContentWrapper');
         const poemContainer = document.getElementById('poemContainer');
 
+        // 记录每种风格的上一首诗歌，避免连续生成同一首
+        let lastPoemId = {};
+        // 记录每种风格已尝试过的诗歌ID，用于避免重复
+        let triedPoems = {};
+        // 每种风格的诗歌数量，初始为空，后续动态更新
+        const poemCountMap = {};
+
+        // 初始化每种风格的尝试过的诗歌集合
+        function initTriedPoems(style) {
+            if (!triedPoems[style]) {
+                triedPoems[style] = new Set();
+            }
+        }
+
         function generatePoem() {
             // 显示加载指示器
             loader.style.display = 'block';
             // 隐藏诗歌内容
             poemContentWrapper.style.display = 'none';
             const style = styleSelect.value;
-            const poemId = Math.floor(Math.random() * 20) + 1; // 1-20
+            
+            // 初始化尝试过的诗歌集合
+            initTriedPoems(style);
+            
+            // 从1开始尝试不同的诗歌ID
+            let poemId = lastPoemId[style] || 0;
+            let attempts = 0;
+            const maxAttempts = 30; // 最大尝试次数
+            
+            // 尝试找到一个未尝试过的或者有效的诗歌ID
+            do {
+                poemId = poemId % (poemCountMap[style] || maxAttempts) + 1;
+                attempts++;
+                // 如果尝试次数过多且有记录的数量，重置尝试过的集合
+                if (attempts > maxAttempts && poemCountMap[style]) {
+                    triedPoems[style].clear();
+                }
+            } while (triedPoems[style].has(poemId) && attempts <= maxAttempts);
+            
+            // 记录本次尝试的诗歌ID
+            triedPoems[style].add(poemId);
+            // 更新上一首诗歌ID
+            lastPoemId[style] = poemId;
+            
             const author = authors[Math.floor(Math.random() * authors.length)];
 
             try {
@@ -212,12 +249,33 @@
                         // 添加动画效果
                         poemContent.classList.add('mdui-animate-fade-in');
                         setTimeout(() => poemContent.classList.remove('mdui-animate-fade-in'), 500);
+                    } else if (xhr.readyState === 4) {
+                        // 如果请求失败，尝试加载其他诗歌
+                        mdui.snackbar({ message: `获取第${poemId}首诗歌失败，尝试加载其他诗歌`, position: 'bottom' });
+                        console.error(`Error loading poem ${poemId}:`, xhr.status);
+                        
+                        // 如果是404错误，说明这个ID的诗歌不存在，更新已知的诗歌数量
+                        if (xhr.status === 404) {
+                            // 如果当前尝试的ID大于已知数量，更新已知数量为当前ID-1
+                            if (!poemCountMap[style] || poemId > poemCountMap[style]) {
+                                poemCountMap[style] = poemId - 1;
+                            }
+                        }
+                        
+                        // 3秒后重试
+                        setTimeout(() => {
+                            generatePoem();
+                        }, 3000);
                     }
                 };
                 xhr.send();
             } catch (error) {
                 mdui.snackbar({ message: '获取诗歌失败，请重试', position: 'bottom' });
                 console.error('Error loading poem:', error);
+                // 确保加载指示器最终会隐藏
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                }, 3000);
             }
         }
 
@@ -274,5 +332,4 @@
     <!-- 引入html2canvas库用于截图分享 -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 </body>
-
 </html>
