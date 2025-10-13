@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电子诗人(IKUN版)</title>
+    <link rel="stylesheet" href="css/mdui.min.css">
+    <link rel="stylesheet" href="waifu.css">
+    <style>
+        /* 加载指示器样式 */
+        .loader {
+            border: 5px solid #f3f3f3; /* 浅色边框 */
+            border-top: 5px solid #3498db; /* 蓝色顶部边框 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10; /* 确保在诗歌内容上面 */
+            display: none; /* 初始隐藏 */
+        }
+
+        .poem-container {
+            position: relative;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        body {
+            background-image: url('background.png');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .poem-container {
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem auto;
+            max-width: 800px;
+            min-height: 400px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .poem-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: #d32f2f;
+        }
+        .poem-content {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .poem-author {
+            font-size: 1rem;
+            text-align: right;
+            color: #666;
+            font-style: italic;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 1rem auto;
+            flex-wrap: wrap;
+            max-width: 800px;
+        }
+        .mdui-btn {
+            margin: 0.25rem;
+        }
+        .controls .mdui-btn {
+            color: white;
+            background-color: #3f51b5;
+        }
+        .controls .mdui-btn:hover {
+            background-color: #303f9f;
+        }
+        .about-dialog {
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body class="mdui-theme-primary-indigo mdui-theme-accent-pink">
+
+    <div class="mdui-container">
+        <div class="poem-container mdui-card" id="poemContainer">
+            <div class="loader" id="loader"></div>
+            <div class="poem-content-wrapper" id="poemContentWrapper" style="display: none;">
+                <div class="poem-title" id="poemTitle">诗歌标题</div>
+                <div class="poem-content" id="poemContent">诗歌内容将在这里显示</div>
+                <div class="poem-author" id="poemAuthor">作者</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <select id="styleSelect" class="mdui-select" mdui-select>
+                <option value="tangshi">唐诗</option>
+                <option value="songci">宋词</option>
+                <option value="modern">现代派</option>
+                <option value="classic">古典风</option>
+                <option value="haiku">俳句</option>
+                <option value="freedom">自由诗</option>
+                <option value="english">英文诗</option>
+            </select>
+            <button id="generateBtn" class="mdui-btn mdui-btn-raised mdui-color-primary">生成诗歌</button>
+            <button id="shareBtn" class="mdui-btn mdui-btn-raised mdui-color-accent">分享</button>
+            <button id="aboutBtn" class="mdui-btn mdui-btn-raised">关于</button>
+        </div>
+    </div>
+
+    <!-- 关于对话框 -->
+
+    <!-- 预览对话框 -->
+    <div class="mdui-dialog" id="previewDialog">
+        <div class="mdui-dialog-title">预览截图</div>
+        <div class="mdui-dialog-content">
+            <div id="previewContainer" style="text-align: center;">
+                <img id="previewImage" style="max-width: 100%; max-height: 600px;" />
+            </div>
+        </div>
+        <div class="mdui-dialog-actions">
+            <button class="mdui-btn mdui-ripple" mdui-dialog-close>取消</button>
+            <button id="saveBtn" class="mdui-btn mdui-ripple">保存</button>
+        </div>
+    </div>
+    <div class="mdui-dialog" id="aboutDialog">
+        <div class="mdui-dialog-title">关于电子诗人(IKUN版)</div>
+        <div class="mdui-dialog-content about-dialog">
+            <p>电子诗人(IKUN版)是一个基于mdui主题的诗歌生成器，专注于生成关于坤、篮球和鸡的主题诗歌。</p>
+            <p>诗歌风格包括：唐诗、宋词、现代派、古典风、俳句、自由诗和英文诗。</p>
+            <p>所有诗歌内容均为虚构，仅供娱乐。</p>
+        </div>
+        <div class="mdui-dialog-actions">
+            <button class="mdui-btn mdui-ripple" mdui-dialog-close>关闭</button>
+        </div>
+    </div>
+
+    <script src="js/mdui.min.js"></script>
+    <script src="waifu-tips.js"></script>
+    <script>
+        // 获取加载指示器
+        const loader = document.getElementById('loader');
+
+        // 作者名字数据
+        const authors = ["蔡徐坤", "鸡哥", "坤哥", "坤", "鸡", "坤坤", "纯鹿人", "苏珊", "梅狸猫"];
+
+        // 获取DOM元素
+        const poemTitle = document.getElementById('poemTitle');
+        const poemContent = document.getElementById('poemContent');
+        const poemAuthor = document.getElementById('poemAuthor');
+        const styleSelect = document.getElementById('styleSelect');
+        const generateBtn = document.getElementById('generateBtn');
+        const shareBtn = document.getElementById('shareBtn');
+        const aboutBtn = document.getElementById('aboutBtn');
+        const aboutDialog = document.getElementById('aboutDialog');
+
+        // 初始化对话框
+        const dialog = new mdui.Dialog(aboutDialog);
+
+        // 生成诗歌函数
+        // 获取诗歌内容包装器
+        const poemContentWrapper = document.getElementById('poemContentWrapper');
+        const poemContainer = document.getElementById('poemContainer');
+
+        function generatePoem() {
+            // 显示加载指示器
+            loader.style.display = 'block';
+            // 隐藏诗歌内容
+            poemContentWrapper.style.display = 'none';
+            const style = styleSelect.value;
+            const poemId = Math.floor(Math.random() * 5) + 1; // 1-5
+            const author = authors[Math.floor(Math.random() * authors.length)];
+
+            try {
+                // 获取诗歌内容
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', `poems/${style}/${poemId}.txt`, true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        const poemText = xhr.responseText;
+                        const [title, ...contentLines] = poemText.split('\n').filter(line => line.trim() !== '');
+                        const content = contentLines.join('\n');
+
+                        // 更新DOM
+                        poemTitle.textContent = title;
+                        poemContent.textContent = content;
+                        poemAuthor.textContent = author;
+
+                        // 确保加载指示器显示至少3秒
+                        setTimeout(() => {
+                            loader.style.display = 'none';
+                            // 加载指示器消失后显示诗歌内容
+                            poemContentWrapper.style.display = 'block';
+                        }, 3000);
+
+                        // 添加动画效果
+                        poemContent.classList.add('mdui-animate-fade-in');
+                        setTimeout(() => poemContent.classList.remove('mdui-animate-fade-in'), 500);
+                    }
+                };
+                xhr.send();
+            } catch (error) {
+                mdui.snackbar({ message: '获取诗歌失败，请重试', position: 'bottom' });
+                console.error('Error loading poem:', error);
+            }
+        }
+
+        // 初始化预览对话框
+        const previewDialog = document.getElementById('previewDialog');
+        const previewDialogObj = new mdui.Dialog(previewDialog);
+        const previewImage = document.getElementById('previewImage');
+        const saveBtn = document.getElementById('saveBtn');
+
+        // 分享功能 - 截图保存
+        function sharePoem() {
+            // 使用html2canvas库实现截图功能
+            if (typeof html2canvas === 'undefined') {
+                // 动态加载html2canvas库
+                const script = document.createElement('script');
+                script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+                script.onload = () => captureAndPreview();
+                document.head.appendChild(script);
+            } else {
+                captureAndPreview();
+            }
+        }
+
+        function captureAndPreview() {
+            const poemContainer = document.querySelector('.poem-container');
+            html2canvas(poemContainer).then(canvas => {
+                // 显示预览图片
+                previewImage.src = canvas.toDataURL('image/png');
+                previewDialogObj.open();
+
+                // 保存按钮点击事件
+                saveBtn.onclick = function() {
+                    // 创建下载链接
+                    const link = document.createElement('a');
+                    link.download = `${poemTitle.textContent.replace(/\s+/g, '_')}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    previewDialogObj.close();
+                };
+            }).catch(error => {
+                mdui.snackbar({ message: '截图失败，请重试', position: 'bottom' });
+                console.error('Error capturing screenshot:', error);
+            });
+        }
+
+        // 事件监听
+        generateBtn.addEventListener('click', generatePoem);
+        shareBtn.addEventListener('click', sharePoem);
+        aboutBtn.addEventListener('click', () => dialog.open());
+
+        // 初始生成一首诗歌
+        window.addEventListener('load', generatePoem);
+    </script>
+    <!-- 引入html2canvas库用于截图分享 -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+</body>
+</html>
